@@ -1,4 +1,4 @@
-import typing import Annotated, TypedDict, Optional
+from typing import Annotated, TypedDict, Optional
 import operator
 
 class ResumeVersion(TypedDict):
