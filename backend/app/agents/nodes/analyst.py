@@ -2,6 +2,7 @@ import os
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langgraph.config import get_stream_writer
 from app.agents.state import AgentState
+from app.prompts.templates import ANALYST_PROMPT
 
 # Initialize the model
 llm = ChatGoogleGenerativeAI(
@@ -12,6 +13,9 @@ llm = ChatGoogleGenerativeAI(
 
 def analyze_requirements_node(state: AgentState):
     """The Scout: Extracts 10 critical hard skills from the Job Description."""
+    
+    prompt = ANALYST_PROMPT.format(jd_text=state['raw_jd'])
+    response = llm.invoke(prompt)
     
     # 1. Start the Thinking Stream
     writer = get_stream_writer()
