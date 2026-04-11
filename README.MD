@@ -34,6 +34,6 @@ A Stateful Multi-Agent System that analyzes a resume against a job description a
 📌 Status
 
 🚧 In Development
-(Currently building graph & pipeline)
+(Currently building frontend & pipeline)
 
 ---
