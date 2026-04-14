@@ -1,17 +1,19 @@
 import os
-from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_groq import ChatGroq
 from langgraph.config import get_stream_writer
 from app.agents.state import AgentState
+from app.core.config import settings
+import time
 
-llm = ChatGoogleGenerativeAI(
-    model="gemini-1.5-flash",
-    temperature=0.2,
-    google_api_key=os.getenv("GOOGLE_API_KEY")
+llm = ChatGroq(
+    model=settings.LLM_MODEL,
+    temperature=0.0,
+    api_key=settings.GROQ_API_KEY
 )
 
-def Critic_node(state: AgentState):
+def critic_node(state: AgentState):
     """The Quality Controller: Evaluates the match and provides feedback."""
-
+    time.sleep(8)
     writer = get_stream_writer()
     score = state.get("latest_final_score", 0)
 
@@ -40,5 +42,7 @@ def Critic_node(state: AgentState):
 
     # 3. Update the state
     return {
-        "critic_notes": feedback
+        "critic_notes": feedback,
+        "iteration_count": state.get("iteration_count", 0) + 1,
+        "current_resume_content": state.get("current_resume_content", "")  # ← ADD THIS
     }

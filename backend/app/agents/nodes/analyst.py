@@ -1,25 +1,25 @@
 import os
-from langchain_google_genai import ChatGoogleGenerativeAI
+import time
+from langchain_groq import ChatGroq
 from langgraph.config import get_stream_writer
 from app.agents.state import AgentState
-from app.prompts.templates import ANALYST_PROMPT
+from app.core.config import settings
 
 # Initialize the model
-llm = ChatGoogleGenerativeAI(
-    model="gemini-1.5-flash",
+llm = ChatGroq(
+    model=settings.LLM_MODEL,
     temperature=0,
-    google_api_key=os.getenv("GOOGLE_API_KEY")
+    api_key=settings.GROQ_API_KEY
 )
 
 def analyze_requirements_node(state: AgentState):
     """The Scout: Extracts 10 critical hard skills from the Job Description."""
     
-    prompt = ANALYST_PROMPT.format(jd_text=state['raw_jd'])
-    response = llm.invoke(prompt)
-    
-    # 1. Start the Thinking Stream
     writer = get_stream_writer()
     writer({"status": "Scanning Job Description for critical keywords...", "node": "analyst"})
+
+    # Safety delay for Free Tier
+    time.sleep(5)
     
     prompt = f"""
     You are an expert Technical Recruiter. Analyze the following Job Description and extract 
@@ -27,8 +27,8 @@ def analyze_requirements_node(state: AgentState):
     
     STRICT RULES:
     - Return ONLY a comma-separated list.
-    - No soft skills (like 'leadership' or 'communication').
-    - Focus on the tech stack and tools.
+    - No soft skills.
+    - No numbering or bullets.
     
     JOB DESCRIPTION:
     {state['raw_jd']}
@@ -36,18 +36,29 @@ def analyze_requirements_node(state: AgentState):
     KEYWORDS:
     """
     
-    # 2. Call Gemini
-    response = llm.invoke(prompt)
+    try:
+        response = llm.invoke(prompt)
+        content = response.content
 
-    # 3. Clean and Parse the output
-    raw_keywords = response.content.split(",")
-    # Remove whitespace and ensure only take the top 10
-    clean_keywords = [k.strip() for k in raw_keywords][:10]
+        # 🛠️ THE FIX: Handle different response types safely
+        if isinstance(content, list):
+            # If Gemini already sent a list
+            raw_keywords = content
+        elif isinstance(content, str):
+            # If it's a string, we split it
+            raw_keywords = content.split(",")
+        else:
+            # Fallback for unexpected types
+            raw_keywords = [str(content)]
 
-    # 4. Final Thinking update
-    writer({"status": f"Extracted {len(clean_keywords)} key technical requirements.", "node": "analyst"})
+        # Clean whitespace and limit to 10
+        clean_keywords = [str(k).strip() for k in raw_keywords if k][:10]
 
-    # 5. Return the update to the State
-    return {
-        "extracted_keywords": clean_keywords
-    }
+        writer({"status": f"Extracted {len(clean_keywords)} key technical requirements.", "node": "analyst"})
+
+        return {
+            "extracted_keywords": clean_keywords
+        }
+    except Exception as e:
+        writer({"status": f"API Error: {str(e)}", "node": "analyst"})
+        raise e
