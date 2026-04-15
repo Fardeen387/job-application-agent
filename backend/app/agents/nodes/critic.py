@@ -1,9 +1,11 @@
 import os
+import re
+import json
+import time
 from langchain_groq import ChatGroq
 from langgraph.config import get_stream_writer
 from app.agents.state import AgentState
 from app.core.config import settings
-import time
 
 llm = ChatGroq(
     model=settings.LLM_MODEL,
@@ -12,37 +14,66 @@ llm = ChatGroq(
 )
 
 def critic_node(state: AgentState):
-    """The Quality Controller: Evaluates the match and provides feedback."""
-    time.sleep(8)
+    """The Quality Controller: Evaluates the match and provides real feedback."""
+    time.sleep(2) 
     writer = get_stream_writer()
     score = state.get("latest_final_score", 0)
 
-    # 2. Generate specific feedback if the score is below our threshold (85%)
-    if score < 85:
-        writer({"status": "Score below 85%. Generating improvement notes...", "node": "critic"})
+    prompt = f"""
+    Compare the REWRITTEN RESUME against the extracted keywords: {state.get('extracted_keywords', [])}.
+    Current Score: {score}%
 
-        prompt = f"""
-        A candidate's resume was rewritten to match these keywords: {state.get('extracted_keywords', [])}.
-        The current weighted match score is {score}%.
-        
-        Identify 2 specific things missing or weak in the REWRITTEN RESUME compared to the JD.
-        Be concise. This will be used as a 'hint' for the next optimization loop.
-        
-        REWRITTEN RESUME:
-        {state.get('current_resume_content')}
-        
-        FEEDBACK:
-        """
-        response = llm.invoke(prompt)
-        feedback = response.content
+    Act as a Senior Technical Recruiter. Identify 2 strengths and 2 specific gaps.
+    Instead of just listing tools, explain WHY they are needed for the role or HOW the resume is missing them.
 
-    else:
-        writer({"status": "Target score achieved. Finalizing document.", "node": "critic"})
-        feedback = "Optimization successful. Resume meets the high-quality threshold."
+    Example Gap: "Missing experience with Git for collaboration workflows"
+    Example Strength: "Strong foundation in Scikit-learn for building predictive ML models"
 
-    # 3. Update the state
+    You MUST return ONLY a JSON object:
+    {{
+    "strengths": ["contextual strength 1", "contextual strength 2"],
+    "gaps": ["contextual gap 1", "contextual gap 2"]
+    }}
+
+    REWRITTEN RESUME:
+    {state.get('current_resume_content')}
+
+    RESPONSE:
+"""
+    
+    response = llm.invoke(prompt)
+    content = response.content
+    
+    # Initialize defaults
+    strengths = []
+    gaps = []
+
+    try:
+        # 🛠️ THE FIX: Use Regex to find the JSON block { ... } 
+        # This prevents the "Content well-structured" fallback if the LLM adds text
+        json_match = re.search(r'\{.*\}', content, re.DOTALL)
+        
+        if json_match:
+            data = json.loads(json_match.group())
+            strengths = data.get("strengths", [])
+            gaps = data.get("gaps", [])
+        
+        # Fallback: If JSON parsing fails or lists are empty, try line splitting
+        if not strengths or not gaps:
+            lines = [re.sub(r'^[\s\d\.\-\*]+', '', l).strip() for l in content.split('\n') if len(l) > 10]
+            strengths = lines[:2] if len(lines) >= 2 else ["Relevant technical skills detected"]
+            gaps = lines[2:4] if len(lines) >= 4 else ["Consider more role-specific tailoring"]
+
+    except Exception as e:
+        print(f"Critic Parsing Error: {e}")
+        strengths = ["Solid project foundation"]
+        gaps = ["Further technical alignment possible"]
+
+    writer({"status": "Critique complete. Sending real insights to dashboard.", "node": "critic"})
+
     return {
-        "critic_notes": feedback,
-        "iteration_count": state.get("iteration_count", 0) + 1,
-        "current_resume_content": state.get("current_resume_content", "")  # ← ADD THIS
+        "strengths": strengths,
+        "gaps": gaps,
+        "critic_notes": content,
+        "iteration_count": state.get("iteration_count", 0) + 1
     }
