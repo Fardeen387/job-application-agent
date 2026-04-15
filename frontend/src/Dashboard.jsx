@@ -107,38 +107,38 @@ async function* fetchAgentStream(file, jobDescription, signal) {
 //                              status (for log lines)
 
 function extractStateFromChunk(raw) {
-  // Direct flat result (unlikely but handle it)
   if (raw.latest_final_score !== undefined || raw.current_resume_content !== undefined) {
     return { type: "result", data: raw };
   }
-  // First event — original resume text
+  
   if (raw.original_resume_text !== undefined) {
     return { type: "original", text: raw.original_resume_text };
   }
-  // LangGraph "updates" format: { "node_name": { ...state... } }
-  // Could also be a tuple ["updates", {...}] serialized as array
+
   if (Array.isArray(raw) && raw.length === 2) {
     const [mode, payload] = raw;
-    if (mode === "updates" || mode === "custom") {
-      return extractStateFromChunk(payload);
-    }
+    if (mode === "updates" || mode === "custom") return extractStateFromChunk(payload);
   }
-  // Check each key — LangGraph wraps state under node name
+
   for (const nodeKey of Object.keys(raw)) {
     const val = raw[nodeKey];
     if (val && typeof val === "object") {
-      // It's a node update — extract state fields
       const state = val;
-      const hasScore  = state.latest_final_score !== undefined;
-      const hasResume = state.current_resume_content !== undefined;
-      const hasStatus = state.status !== undefined;
-      if (hasScore || hasResume) {
+      
+      // 🚀 THE FIX: Check for strengths and gaps here
+      const hasScore   = state.latest_final_score    !== undefined;
+      const hasResume  = state.current_resume_content !== undefined;
+      const hasStatus  = state.status                 !== undefined;
+      const hasInsights = state.strengths             !== undefined || state.gaps !== undefined;
+
+      if (hasScore || hasResume || hasInsights) { // Included hasInsights
         return { type: "result", data: state, node: nodeKey };
       }
+      
       if (hasStatus) {
         return { type: "status", node: nodeKey, status: state.status };
       }
-      // Recurse one more level (custom events)
+
       const inner = extractStateFromChunk(state);
       if (inner.type !== "unknown") return inner;
     }
@@ -203,6 +203,18 @@ function CircularScore({ score, semanticScore, keywordScore }) {
 
 function TerminalLine({ entry, index }) {
   const n = NODE_COLORS[entry.node] || NODE_COLORS.default;
+  
+  // Logic to handle JSON vs String logs
+  let displayMessage = entry.status;
+  if (typeof entry.status === 'object') {
+    // If it's the analyst's keyword list, show a clean message
+    if (entry.status.extracted_keywords) {
+      displayMessage = `Extracted ${entry.status.extracted_keywords.length} core technical requirements.`;
+    } else {
+      displayMessage = JSON.stringify(entry.status); // Fallback
+    }
+  }
+
   return (
     <motion.div initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }}
       transition={{ duration: 0.25, delay: index * 0.02 }}
@@ -214,7 +226,7 @@ function TerminalLine({ entry, index }) {
       </span>
       <Badge node={entry.node} />
       <span style={{ color: n.color, fontFamily: "monospace", fontSize: 12,
-        lineHeight: 1.5, flex: 1 }}>{entry.status}</span>
+        lineHeight: 1.5, flex: 1 }}>{displayMessage}</span>
       {entry.done && <CheckCircle size={14} color={C.success} style={{ flexShrink: 0, marginTop: 2 }} />}
     </motion.div>
   );
@@ -272,20 +284,26 @@ function VerdictSection({ score }) {
   );
 }
 
-function ExplanationSection({ score, semanticScore, keywordScore }) {
-  const strengths = [];
-  const gaps = [];
+function ExplanationSection({ result }) {
+  // 1. EXTRACT REAL DATA
+  // Use the lists from the Critic node if they exist, otherwise fallback to your logic
+  let strengths = result?.strengths || [];
+  let gaps = result?.gaps || [];
 
-  if (semanticScore != null && semanticScore >= 65) strengths.push("Strong semantic alignment with the job description");
-  if (keywordScore != null && keywordScore >= 70) strengths.push("Good keyword coverage for ATS matching");
-  if (score >= 75) strengths.push("Overall content is well-suited for this role");
-  if (semanticScore != null && semanticScore >= 80) strengths.push("High contextual relevance across resume sections");
+  // 2. FALLBACK LOGIC (Only if Critic hasn't sent real lists yet)
+  if (strengths.length === 0 && gaps.length === 0) {
+    const { score, semanticScore, keywordScore } = result || {};
+    
+    if (semanticScore >= 65) strengths.push("Strong semantic alignment with the job description");
+    if (keywordScore >= 70) strengths.push("Good keyword coverage for ATS matching");
+    if (score >= 75) strengths.push("Overall content is well-suited for this role");
+    
+    if (semanticScore < 65) gaps.push("Low semantic similarity — content may not match role context");
+    if (keywordScore < 70) gaps.push("Missing key terms from job description");
+    if (score < 75 && score >= 50) gaps.push("Resume could benefit from role-specific tailoring");
+  }
 
-  if (semanticScore != null && semanticScore < 65) gaps.push("Low semantic similarity — content may not match role context");
-  if (keywordScore != null && keywordScore < 70) gaps.push("Missing key terms from job description");
-  if (score < 50) gaps.push("Overall match is too low — consider rewriting core sections");
-  if (score < 75 && score >= 50) gaps.push("Resume could benefit from role-specific tailoring");
-
+  // Ensure there is at least something to show
   if (strengths.length === 0) strengths.push("Some relevant experience detected");
   if (gaps.length === 0) gaps.push("No major gaps identified at this score level");
 
@@ -296,32 +314,29 @@ function ExplanationSection({ score, semanticScore, keywordScore }) {
         borderTop: `3px solid ${C.success}`, borderRadius: 8, padding: "18px 20px" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
           <span style={{ fontSize: 16, lineHeight: 1 }}>✓</span>
-          <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.15em",
-            color: C.success }}>STRENGTHS</span>
+          <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.15em", color: C.success }}>STRENGTHS</span>
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           {strengths.map((s, i) => (
             <div key={i} style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
-              <span style={{ color: C.success, fontSize: 18, lineHeight: 1.1,
-                flexShrink: 0, marginTop: 1 }}>•</span>
+              <span style={{ color: C.success, fontSize: 18, lineHeight: 1.1, flexShrink: 0, marginTop: 1 }}>•</span>
               <span style={{ fontSize: 13, color: "#c9e8d4", lineHeight: 1.6 }}>{s}</span>
             </div>
           ))}
         </div>
       </div>
+
       {/* Gaps card */}
       <div style={{ background: "#1a0808", border: `1.5px solid ${C.error}40`,
         borderTop: `3px solid ${C.error}`, borderRadius: 8, padding: "18px 20px" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
           <span style={{ fontSize: 16, lineHeight: 1 }}>✗</span>
-          <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.15em",
-            color: C.error }}>GAPS</span>
+          <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.15em", color: C.error }}>GAPS</span>
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           {gaps.map((g, i) => (
             <div key={i} style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
-              <span style={{ color: C.error, fontSize: 18, lineHeight: 1.1,
-                flexShrink: 0, marginTop: 1 }}>•</span>
+              <span style={{ color: C.error, fontSize: 18, lineHeight: 1.1, flexShrink: 0, marginTop: 1 }}>•</span>
               <span style={{ fontSize: 13, color: "#f0c0c0", lineHeight: 1.6 }}>{g}</span>
             </div>
           ))}
@@ -403,24 +418,17 @@ export default function Dashboard() {
 
         if (parsed.type === "result") {
           const s = parsed.data;
-          
-          // We use the "functional update" (prev => ...) to ensure we don't lose old data
-          setResult(prev => {
-            return {
-              // Keep original text from your Ref or the previous state
-              original:      originalTextRef.current || prev?.original || `[Original: ${file.name}]`,
-              
-              // If the new chunk has optimized text, use it; otherwise, keep the old one
-              optimized:     s.current_resume_content || prev?.optimized || "",
-              
-              // CRITICAL: If new score is missing (undefined/null), keep the 74% from before
-              score:         s.latest_final_score    ?? prev?.score         ?? 0,
-              semanticScore: s.latest_semantic_score ?? prev?.semanticScore ?? null,
-              keywordScore:  s.latest_keyword_score  ?? prev?.keywordScore  ?? null,
-            };
-          });
-          
-          setActiveTab("results");
+          setResult(prev => ({
+            ...prev,
+            original:      originalTextRef.current        || prev?.original      || "",
+            optimized:     s.current_resume_content       || prev?.optimized     || "",
+            score:         s.latest_final_score           ?? prev?.score         ?? 0,
+            semanticScore: s.latest_semantic_score        ?? prev?.semanticScore ?? null,
+            keywordScore:  s.latest_keyword_score         ?? prev?.keywordScore  ?? null,
+            // 🚀 These will now correctly update when the Critic finishes
+            strengths:     s.strengths                    ?? prev?.strengths     ?? [],
+            gaps:          s.gaps                         ?? prev?.gaps          ?? []
+          }));
           continue;
         }
 
@@ -813,7 +821,7 @@ export default function Dashboard() {
                             </div>
                           </div>
                           <VerdictSection score={result.score} />
-                          <ExplanationSection score={result.score} semanticScore={result.semanticScore} keywordScore={result.keywordScore} />
+                          <ExplanationSection result={result} />
                         </div>
                       )}
 
