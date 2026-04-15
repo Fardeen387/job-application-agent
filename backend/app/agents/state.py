@@ -33,3 +33,6 @@ class AgentState(TypedDict):
     # --- FEEDBACK LOOP DATA ---
     critic_notes: str
     iteration_count: int
+
+    strengths: list[str]
+    gaps: list[str]
