@@ -40,4 +40,4 @@ class EmbeddingService:
         return found_count / len(required_keywords)
     
     def get_weighted_score(self, semantic_score: float, keyword_score: float) -> float:
-        return (0.4 * semantic_score) + (0.6 * keyword_score)
+        return (0.7 * semantic_score) + (0.3 * keyword_score)
