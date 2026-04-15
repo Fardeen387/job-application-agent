@@ -1,6 +1,5 @@
 from app.agents.state import AgentState
 from app.services.embedding_service import EmbeddingService
-# from app.prompts.templates import MATCHER_PROMPT # <--- Use your template!
 import time
 
 matcher_service = EmbeddingService()
@@ -18,7 +17,6 @@ def score_match_node(state: AgentState):
     keywords = state.get("extracted_keywords", [])
 
     # 🛠️ THE FIX: Ensure resume is a clean string
-    # LangChain sometimes returns a message object or a dict in the second loop
     if isinstance(raw_resume, dict):
         resume_text = raw_resume.get("content", str(raw_resume))
     elif hasattr(raw_resume, "content"):
@@ -38,7 +36,7 @@ def score_match_node(state: AgentState):
         "latest_semantic_score": round(semantic_sim * 100, 2),
         "latest_keyword_score": round(kw_match * 100, 2),
         "latest_final_score": round(final_score * 100, 2),
-        "current_resume_content": resume_text,  # ← ADD THIS
+        "current_resume_content": resume_text,  
         "resume_history": [{
             "content": resume_text,
             "semantic_score": round(semantic_sim * 100, 2),
