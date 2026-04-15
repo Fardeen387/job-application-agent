@@ -65,22 +65,21 @@ This ensures:
 
 ## 🖥️ Frontend Highlights
 
-* Overview Tab:
+* **Overview Tab**
 
   * Match score
   * Verdict
   * Strengths & gaps
 
-* Analysis Tab:
+* **Analysis Tab**
 
   * Original vs Optimized resume (side-by-side)
 
-* Live Agent Logs:
+* **Agent Logs**
 
   * Visualizes multi-agent execution flow
 
 ---
-
 
 ## 🛠️ Tech Stack
 
@@ -95,14 +94,38 @@ This ensures:
 ## 📁 Project Structure
 
 ```text
-backend/
-  agents/
-  services/
-  core/
-
-frontend/
-  src/
-    Dashboard.jsx
+job-application-agent/
+│
+├── backend/
+│   ├── app/
+│   │   ├── agents/
+│   │   │   ├── nodes/        # Analyst, Matcher, Optimizer, Critic
+│   │   │   ├── graph.py      # LangGraph workflow definition
+│   │   │   └── state.py      # Shared agent state
+│   │   │
+│   │   ├── services/
+│   │   │   ├── embedding_service.py
+│   │   │   └── pdf_parser.py
+│   │   │
+│   │   ├── prompts/
+│   │   │   └── templates.py  # LLM prompt templates
+│   │   │
+│   │   ├── core/
+│   │   │   └── config.py     # Configuration & environment
+│   │   │
+│   │   └── main.py           # FastAPI entry point
+│   │
+│   ├── test_backend.py
+│   └── create_test_pdf.py
+│
+├── frontend/
+│   ├── src/
+│   │   └── Dashboard.jsx     # Main UI dashboard
+│   └── package.json
+│
+├── available_models.py
+├── requirements.txt
+└── README.md
 ```
 
 ---
@@ -122,13 +145,16 @@ frontend/
 ## 📌 Example Output
 
 * Match Score: 66%
-* Strength:
+
+* **Strength**
 
   * Strong Python and ML foundation demonstrated through projects
-* Gap:
+
+* **Gap**
 
   * Missing cloud deployment experience (AWS/GCP)
-* Optimized Resume:
+
+* **Optimized Resume**
 
   * Improved alignment with job description
 
