@@ -1,47 +1,167 @@
-🧠 Job Application Agent (WIP)
+# 🧠 AI Resume Intelligence System (Multi-Agent)
 
-A Stateful Multi-Agent System that analyzes a resume against a job description, evaluates match quality, and improves it iteratively with explainable reasoning.
-
----
-
-🚀 Current Progress
-
-* Extract key requirements from Job Description
-* Analyze resume content using multi-agent pipeline
-* Compute match score using semantic + keyword signals
-* Generate optimized resume based on job role
-* Provide explainable output (strengths & gaps)
-* Display real-time agent execution logs in UI
+A multi-agent AI system that evaluates and optimizes resumes against job descriptions using semantic analysis, structured reasoning, and explainable feedback.
 
 ---
 
-🤖 Implemented Agents
+## 🚀 Overview
 
-* Analyst → Extracts structured data from resume & JD
-* Matcher → Computes similarity and identifies missing skills
-* Scorer → Calculates match score
-* Optimizer → Improves resume content based on JD
-* Critic → Evaluates output and refines iterations
+This project implements a **stateful multi-agent workflow** to simulate how a recruiter evaluates resumes.
+
+Instead of relying only on keyword matching, the system combines:
+
+* Semantic understanding (embeddings)
+* Keyword analysis (ATS-style matching)
+* Context-aware reasoning (LLM-based explanation)
+
+It produces:
+
+* Match score
+* Strengths & gaps
+* Optimized resume
+* Explainable insights
+
+---
+
+## 🧩 System Architecture
+
+The system is built using a **multi-agent pipeline (LangGraph)**:
+
+* 🧠 **Analyst** → Extracts structured information from resume & job description
+* 🔗 **Matcher** → Compares resume with JD using embeddings + keywords
+* 📊 **Scorer** → Computes weighted match score
+* ⚙️ **Optimizer** → Improves resume content (without hallucination)
+* 🧪 **Critic** → Evaluates and generates strengths & gaps
 
 ---
 
-🛠️ Tech Stack (Current)
+## 📊 Scoring Strategy
 
-* LangGraph (multi-agent orchestration)
-* FastAPI (backend)
-* Gemini API (LLM)
-* Vector Embeddings (semantic similarity)
-* React (frontend dashboard)
+To avoid misleading results from keyword stuffing, the system uses:
+
+```text
+Final Score = 0.7 × Semantic Score + 0.3 × Keyword Score
+```
+
+This ensures:
+
+* Meaning > keywords
+* Better alignment with real-world evaluation
+
+---
+
+## ✨ Features
+
+* 🔍 **Semantic Resume Matching** using vector embeddings
+* ⚖️ **Weighted Scoring System** (reduces keyword bias)
+* 🧠 **Explainable AI Output** (strengths & gaps with context)
+* 🚫 **No Hallucination** (strict grounding in resume content)
+* 🔄 **Multi-Agent Workflow** using LangGraph
+* 📄 **Resume Optimization** based on job description
+* 🖥️ **Interactive Dashboard (React)**
+* 📜 **Real-time Agent Execution Logs**
 
 ---
 
-📌 Status
+## 🖥️ Frontend Highlights
 
-🚧 In Active Development
+* Overview Tab:
 
-* Backend pipeline working
-* Frontend dashboard integrated
-* Agent logs and explainability added
-* UI/UX improvements ongoing
+  * Match score
+  * Verdict
+  * Strengths & gaps
+
+* Analysis Tab:
+
+  * Original vs Optimized resume (side-by-side)
+
+* Live Agent Logs:
+
+  * Visualizes multi-agent execution flow
 
 ---
+
+
+## 🛠️ Tech Stack
+
+**Backend:** FastAPI · LangGraph · Gemini API · HuggingFace Embeddings · Python
+
+**Frontend:** React.js · Tailwind CSS
+
+**AI/ML:** Multi-Agent Workflow · Semantic Search · Vector Embeddings · LLM Integration
+
+---
+
+## 📁 Project Structure
+
+```text
+backend/
+  agents/
+  services/
+  core/
+
+frontend/
+  src/
+    Dashboard.jsx
+```
+
+---
+
+## ⚙️ How It Works
+
+1. Upload resume + job description
+2. Analyst extracts structured data
+3. Matcher computes semantic + keyword similarity
+4. Scorer calculates final score
+5. Optimizer rewrites resume content
+6. Critic generates strengths & gaps
+7. Results displayed in dashboard
+
+---
+
+## 📌 Example Output
+
+* Match Score: 66%
+* Strength:
+
+  * Strong Python and ML foundation demonstrated through projects
+* Gap:
+
+  * Missing cloud deployment experience (AWS/GCP)
+* Optimized Resume:
+
+  * Improved alignment with job description
+
+---
+
+## 🎯 Key Learnings
+
+* Designing multi-agent systems
+* Balancing semantic vs keyword scoring
+* Preventing hallucination in LLM outputs
+* Building explainable AI interfaces
+* Integrating backend + frontend systems
+
+---
+
+## 🚧 Future Improvements
+
+* Add RAG-based retrieval
+* Store results in database
+* User authentication
+* Deploy as SaaS tool
+
+---
+
+## 👨‍💻 Author
+
+Fardeen Khan
+B.Tech CSE | Aspiring ML Engineer
+
+---
+
+## ⭐ Final Note
+
+This project focuses on building a **realistic AI evaluation system**, not just a resume keyword checker.
+
+It demonstrates how multi-agent AI systems can provide **transparent, grounded, and actionable insights**.
