@@ -49,7 +49,6 @@ def critic_node(state: AgentState):
     gaps = []
 
     try:
-        # 🛠️ THE FIX: Use Regex to find the JSON block { ... } 
         # This prevents the "Content well-structured" fallback if the LLM adds text
         json_match = re.search(r'\{.*\}', content, re.DOTALL)
         

@@ -16,7 +16,7 @@ def score_match_node(state: AgentState):
     jd = state.get("raw_jd")
     keywords = state.get("extracted_keywords", [])
 
-    # 🛠️ THE FIX: Ensure resume is a clean string
+    # THE FIX: Ensure resume is a clean string
     if isinstance(raw_resume, dict):
         resume_text = raw_resume.get("content", str(raw_resume))
     elif hasattr(raw_resume, "content"):

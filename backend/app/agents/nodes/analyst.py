@@ -45,7 +45,7 @@ def analyze_requirements_node(state: AgentState):
             # If Gemini already sent a list
             raw_keywords = content
         elif isinstance(content, str):
-            # If it's a string, we split it
+            # If it's a string, split it
             raw_keywords = content.split(",")
         else:
             # Fallback for unexpected types

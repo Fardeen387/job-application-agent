@@ -13,7 +13,7 @@ def should_continue(state: AgentState):
         print(f"✅ Target reached at {score}%. Stopping.")
         return "finish"
 
-    if iterations >= 2:  # ← lower to 2 to save tokens
+    if iterations >= 3:  # ← lower to 2 to save tokens
         print(f"🛑 Max iterations ({iterations}) reached. Stopping.")
         return "finish"
 
