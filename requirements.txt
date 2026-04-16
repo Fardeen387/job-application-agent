@@ -1,8 +1,21 @@
+# Web Framework & Server
 fastapi
-uvicorn
-langgraph
-langchain-google-genai
+uvicorn[standard]
+pydantic
 python-dotenv
-scikit-learn
-numpy
-pymupdf
+
+# AI Orchestration & LLMs
+langgraph
+langchain
+langchain-core
+langchain-community
+langchain-groq
+
+# Document Parsing (Adjust if you used a different library in pdf_parser.py)
+pypdf
+PyMuPDF
+
+# Embeddings & Vector Search (Adjust based on your embedding_service.py)
+langchain-huggingface
+sentence-transformers
+chromadb
