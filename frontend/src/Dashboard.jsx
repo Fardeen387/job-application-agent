@@ -827,9 +827,23 @@ export default function Dashboard() {
 
                       {resultsTab === "analysis" && (
                         <div style={{ padding: "20px 20px" }}>
-                          <div style={{ fontSize: 10, color: C.muted, letterSpacing: "0.18em",
-                            marginBottom: 14, fontWeight: 700 }}>DOCUMENT COMPARISON</div>
-                          <SideBySide original={result.original} optimized={result.optimized} />
+                          {result.score < 50 ? (
+                            <div style={{ padding: "40px", textAlign: "center", background: "#1a0808", 
+                              border: `1px solid ${C.error}40`, borderRadius: 8 }}>
+                              <AlertCircle size={32} color={C.error} style={{ margin: "0 auto 12px" }} />
+                              <h3 style={{ color: C.error, marginTop: 0, fontSize: 16 }}>Optimization Aborted</h3>
+                              <p style={{ color: "#f0c0c0", fontSize: 13, maxWidth: 400, margin: "0 auto", lineHeight: 1.6 }}>
+                                The match score ({Math.round(result.score)}%) is below the required 50% threshold. 
+                                To prevent AI hallucination, the Optimizer is disabled for documents that are fundamentally misaligned with the job description.
+                              </p>
+                            </div>
+                          ) : (
+                            <>
+                              <div style={{ fontSize: 10, color: C.muted, letterSpacing: "0.18em",
+                                marginBottom: 14, fontWeight: 700 }}>DOCUMENT COMPARISON</div>
+                              <SideBySide original={result.original} optimized={result.optimized} />
+                            </>
+                          )}
                         </div>
                       )}
                     </div>
