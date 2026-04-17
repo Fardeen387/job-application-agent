@@ -46,7 +46,7 @@ async function* fetchAgentStream(file, jobDescription, signal) {
   form.append("resume_file", file);
   form.append("jd_text", jobDescription);
 
-  const res = await fetch("https://fardeen1004-resume-ai-backend.hf.space", {
+  const res = await fetch("https://fardeen1004-resume-ai-backend.hf.space/optimize", {
     method: "POST",
     body: form,
     signal,
