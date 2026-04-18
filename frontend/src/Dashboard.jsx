@@ -107,40 +107,47 @@ async function* fetchAgentStream(file, jobDescription, signal) {
 //                              status (for log lines)
 
 function extractStateFromChunk(raw) {
-  if (raw.latest_final_score !== undefined || raw.current_resume_content !== undefined) {
-    return { type: "result", data: raw };
+  // 1. Handle explicit status updates
+  if (Array.isArray(raw) && raw.length === 2 && raw[0] === "custom") {
+    return { type: "status", node: raw[1].node || "agent", status: raw[1].status };
   }
   
+  if (Array.isArray(raw) && raw.length === 2 && raw[0] === "updates") {
+    return extractStateFromChunk(raw[1]);
+  }
+
+  // 2. Handle the initial resume text
   if (raw.original_resume_text !== undefined) {
     return { type: "original", text: raw.original_resume_text };
   }
 
-  if (Array.isArray(raw) && raw.length === 2) {
-    const [mode, payload] = raw;
-    if (mode === "updates" || mode === "custom") return extractStateFromChunk(payload);
-  }
-
+  // 3. TRANSLATE RAW DATA INTO TERMINAL MESSAGES
   for (const nodeKey of Object.keys(raw)) {
-    const val = raw[nodeKey];
-    if (val && typeof val === "object") {
-      const state = val;
+    const state = raw[nodeKey];
+    if (state && typeof state === "object") {
       
-      // 🚀 THE FIX: Check for strengths and gaps here
-      const hasScore   = state.latest_final_score    !== undefined;
-      const hasResume  = state.current_resume_content !== undefined;
-      const hasStatus  = state.status                 !== undefined;
-      const hasInsights = state.strengths             !== undefined || state.gaps !== undefined;
-
-      if (hasScore || hasResume || hasInsights) { // Included hasInsights
-        return { type: "result", data: state, node: nodeKey };
-      }
+      let cleanMessage = null;
       
-      if (hasStatus) {
-        return { type: "status", node: nodeKey, status: state.status };
+      if (state.status) {
+        cleanMessage = state.status;
+      } else if (state.extracted_keywords) {
+        cleanMessage = `Parsing complete. Extracted ${state.extracted_keywords.length} core technical requirements.`;
+      } else if (state.latest_semantic_score !== undefined) {
+        cleanMessage = `Gap analysis finished. Semantic match: ${state.latest_final_score}%.`;
+      } else if (state.current_resume_content && !state.latest_final_score) {
+        cleanMessage = `Rewriting bullet points for ATS compatibility...`;
+      } else if (state.strengths) {
+        cleanMessage = `Critique complete. Generating final insight report...`;
+      } else {
+        cleanMessage = `Processing ${nodeKey} data payload...`; 
       }
 
-      const inner = extractStateFromChunk(state);
-      if (inner.type !== "unknown") return inner;
+      return { 
+        type: "update", 
+        node: nodeKey, 
+        data: state, 
+        status: cleanMessage 
+      };
     }
   }
   return { type: "unknown", raw };
@@ -402,9 +409,7 @@ export default function Dashboard() {
     try {
       for await (const raw of fetchAgentStream(file, jd, controller.signal)) {
         console.log("SSE CHUNK:", raw);
-
         const parsed = extractStateFromChunk(raw);
-        console.log("PARSED:", parsed);
 
         if (parsed.type === "original") {
           originalTextRef.current = parsed.text;
@@ -412,11 +417,15 @@ export default function Dashboard() {
         }
 
         if (parsed.type === "status") {
-          setLogs(prev => [...prev, { node: parsed.node, status: parsed.status, done: false }]);
+          setLogs(prev => [...prev, { node: parsed.node, status: parsed.status, done: true }]);
           continue;
         }
 
-        if (parsed.type === "result") {
+        if (parsed.type === "update") {
+          // 1. ADD CLEAN SENTENCE TO TERMINAL
+          setLogs(prev => [...prev, { node: parsed.node, status: parsed.status, done: true }]);
+
+          // 2. UPDATE THE DASHBOARD CHARTS/DATA
           const s = parsed.data;
           setResult(prev => ({
             ...prev,
@@ -425,19 +434,15 @@ export default function Dashboard() {
             score:         s.latest_final_score           ?? prev?.score         ?? 0,
             semanticScore: s.latest_semantic_score        ?? prev?.semanticScore ?? null,
             keywordScore:  s.latest_keyword_score         ?? prev?.keywordScore  ?? null,
-            // 🚀 These will now correctly update when the Critic finishes
             strengths:     s.strengths                    ?? prev?.strengths     ?? [],
             gaps:          s.gaps                         ?? prev?.gaps          ?? []
           }));
           continue;
         }
 
-        // Unknown chunk — log it, add to terminal as raw info
         if (parsed.type === "unknown") {
+          // Ignore unparseable chunks so they don't ruin the clean terminal look
           console.warn("UNKNOWN CHUNK:", parsed.raw);
-          // Try to surface any status-like string from unknown chunks
-          const asStr = JSON.stringify(parsed.raw);
-          setLogs(prev => [...prev, { node: "default", status: asStr.slice(0, 120), done: false }]);
         }
       }
 
