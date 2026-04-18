@@ -133,8 +133,8 @@ function extractStateFromChunk(raw) {
       } else if (state.extracted_keywords) {
         cleanMessage = `Parsing complete. Extracted ${state.extracted_keywords.length} core technical requirements.`;
       } else if (state.latest_semantic_score !== undefined) {
-        cleanMessage = `Gap analysis finished. Semantic match: ${state.latest_final_score}%.`;
-      } else if (state.current_resume_content && !state.latest_final_score) {
+        cleanMessage = `Gap analysis finished. Semantic match: ${Math.round(state.latest_semantic_score)}%.`;
+      } else if (state.current_resume_content && state.latest_final_score === undefined) {
         cleanMessage = `Rewriting bullet points for ATS compatibility...`;
       } else if (state.strengths) {
         cleanMessage = `Critique complete. Generating final insight report...`;
@@ -176,11 +176,12 @@ function Badge({ node }) {
 }
 
 function CircularScore({ score, semanticScore, keywordScore }) {
-  const rounded = Math.round(score);
+  const safeScore = typeof score === "number" && !isNaN(score) ? score : 0;
+  const rounded = Math.round(safeScore);
   const r = 54, cx = 70, cy = 70;
   const circ = 2 * Math.PI * r;
-  const dash = (score / 100) * circ;
-  const color = score >= 80 ? C.success : score >= 60 ? C.scorer : C.error;
+  const dash = (safeScore / 100) * circ;
+  const color = safeScore >= 80 ? C.success : safeScore >= 60 ? C.scorer : C.error;
   return (
     <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8 }}>
       <svg width={140} height={140} viewBox="0 0 140 140">
@@ -201,7 +202,7 @@ function CircularScore({ score, semanticScore, keywordScore }) {
         <GlowDot color={color} pulse />
         <span style={{ fontSize: 11, color, fontFamily: "monospace", fontWeight: 700,
           letterSpacing: "0.1em" }}>
-          {score >= 80 ? "STRONG MATCH" : score >= 60 ? "PARTIAL MATCH" : "LOW MATCH"}
+          {safeScore >= 80 ? "STRONG MATCH" : safeScore >= 60 ? "PARTIAL MATCH" : "LOW MATCH"}
         </span>
       </div>
     </div>
@@ -224,7 +225,7 @@ function TerminalLine({ entry, index }) {
 
   return (
     <motion.div initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }}
-      transition={{ duration: 0.25, delay: index * 0.02 }}
+      transition={{ duration: 0.25, delay: Math.min(index * 0.02, 0.3) }}
       style={{ display: "flex", gap: 10, alignItems: "flex-start",
         padding: "5px 0", borderBottom: `1px solid ${C.border}20` }}>
       <span style={{ color: C.muted, fontFamily: "monospace", fontSize: 11, flexShrink: 0,
@@ -301,13 +302,13 @@ function ExplanationSection({ result }) {
   if (strengths.length === 0 && gaps.length === 0) {
     const { score, semanticScore, keywordScore } = result || {};
     
-    if (semanticScore >= 65) strengths.push("Strong semantic alignment with the job description");
-    if (keywordScore >= 70) strengths.push("Good keyword coverage for ATS matching");
-    if (score >= 75) strengths.push("Overall content is well-suited for this role");
+    if (semanticScore != null && semanticScore >= 65) strengths.push("Strong semantic alignment with the job description");
+    if (keywordScore  != null && keywordScore  >= 70) strengths.push("Good keyword coverage for ATS matching");
+    if (score         != null && score         >= 75) strengths.push("Overall content is well-suited for this role");
     
-    if (semanticScore < 65) gaps.push("Low semantic similarity — content may not match role context");
-    if (keywordScore < 70) gaps.push("Missing key terms from job description");
-    if (score < 75 && score >= 50) gaps.push("Resume could benefit from role-specific tailoring");
+    if (semanticScore != null && semanticScore < 65) gaps.push("Low semantic similarity — content may not match role context");
+    if (keywordScore  != null && keywordScore  < 70) gaps.push("Missing key terms from job description");
+    if (score         != null && score < 75 && score >= 50) gaps.push("Resume could benefit from role-specific tailoring");
   }
 
   // Ensure there is at least something to show
@@ -373,12 +374,14 @@ export default function Dashboard() {
   const [activeTab, setActiveTab] = useState("terminal");
   const [resultsTab, setResultsTab] = useState("overview");
   const fileRef = useRef();
-  const logsEndRef = useRef();
+  const logsContainerRef = useRef();
   const abortRef = useRef(null);       // holds AbortController
   const originalTextRef = useRef(""); // preserves original resume text for comparison
 
   useEffect(() => {
-    logsEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    if (logsContainerRef.current) {
+      logsContainerRef.current.scrollTop = logsContainerRef.current.scrollHeight;
+    }
   }, [logs]);
 
   const handleFile = (f) => {
@@ -427,6 +430,7 @@ export default function Dashboard() {
 
           // 2. UPDATE THE DASHBOARD CHARTS/DATA
           const s = parsed.data;
+          const hasScore = s.latest_final_score !== undefined;
           setResult(prev => ({
             ...prev,
             original:      originalTextRef.current        || prev?.original      || "",
@@ -437,6 +441,9 @@ export default function Dashboard() {
             strengths:     s.strengths                    ?? prev?.strengths     ?? [],
             gaps:          s.gaps                         ?? prev?.gaps          ?? []
           }));
+
+          // 3. Switch to results tab when score data arrives
+          if (hasScore) setActiveTab("results");
           continue;
         }
 
@@ -737,7 +744,7 @@ export default function Dashboard() {
                       <span style={{ fontSize: 10, color: C.muted,
                         letterSpacing: "0.1em" }}>LANGGRAPH EXECUTION LOG</span>
                     </div>
-                    <div style={{ flex: 1, overflowY: "auto", padding: "12px 16px" }}>
+                    <div ref={logsContainerRef} style={{ flex: 1, overflowY: "auto", padding: "12px 16px" }}>
                       {logs.length === 0 && (
                         <div style={{ color: C.dim, fontSize: 12, padding: "20px 0",
                           textAlign: "center" }}>
@@ -758,7 +765,6 @@ export default function Dashboard() {
                           ))}
                         </div>
                       )}
-                      <div ref={logsEndRef} />
                     </div>
                   </motion.div>
                 )}
@@ -811,7 +817,7 @@ export default function Dashboard() {
                               <div style={{ fontSize: 10, color: C.muted, letterSpacing: "0.18em",
                                 marginBottom: 14, fontWeight: 700 }}>SCORE BREAKDOWN</div>
                               {[
-                                { label: "Final Match Score",  val: `${Math.round(result.score)}%`,                                                   color: C.accent   },
+                                { label: "Final Match Score",  val: `${Math.round(result.score ?? 0)}%`,                                                   color: C.accent   },
                                 { label: "Semantic Score",     val: result.semanticScore != null ? `${Math.round(result.semanticScore)}%` : "—", color: C.matcher  },
                                 { label: "Keyword Score",      val: result.keywordScore  != null ? `${Math.round(result.keywordScore)}%`  : "—", color: C.optimizer},
                               ].map(({ label, val, color }) => (
